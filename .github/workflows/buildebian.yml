@@ -9,6 +9,10 @@ on:
     # Build weekly on Monday 00:00 UTC
     - cron: '0 0 * * 1'
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   build-bootstrap:
     runs-on: ubuntu-22.04
@@ -241,8 +245,17 @@ jobs:
           path: debian-aarch64-bootstrap.tar.gz
           retention-days: 30
 
+      - name: Generate release tag
+        id: generate_tag
+        run: |
+          # Create a tag based on timestamp and commit
+          TAG="bootstrap-$(date +%Y%m%d-%H%M%S)"
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          TAG="${TAG}-${COMMIT_SHORT}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Generated release tag: $TAG"
+
       - name: Check file exists before release
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           if [ -f debian-aarch64-bootstrap.tar.gz ]; then
             echo "✓ File found, ready for release"
@@ -253,11 +266,11 @@ jobs:
             exit 1
           fi
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create GitHub Release (Auto-upload on every build)
         uses: softprops/action-gh-release@v1
         with:
           files: debian-aarch64-bootstrap.tar.gz
+          tag_name: ${{ steps.generate_tag.outputs.tag }}
           draft: false
           prerelease: false
           body: |
