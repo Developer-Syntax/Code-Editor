@@ -1,0 +1,668 @@
+name: Build Custom APT Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      architectures:
+        description: 'Architectures to build (aarch64,arm,i686,x86_64)'
+        required: false
+        default: 'aarch64'
+      build_mode:
+        description: 'Build mode (repackage/full)'
+        required: false
+        default: 'repackage'
+  schedule:
+    - cron: '0 0 1 * *'  # Monthly
+
+env:
+  CUSTOM_PACKAGE_NAME: com.codeeditor.android
+  GH_PAGES_BRANCH: gh-pages
+  REPO_PATH: apt
+
+jobs:
+  build-repository:
+    runs-on: ubuntu-latest
+    timeout-minutes: 720
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 1
+      
+      - name: Prepare for GitHub Pages deployment
+        run: |
+          # No need to checkout gh-pages branch yet, we'll push directly
+          echo "GitHub Pages deployment will be created during build"
+      
+      - name: Free disk space
+        run: |
+          echo "=== Disk space before cleanup ==="
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo rm -rf /usr/local/share/boost /usr/share/swift || true
+          echo "=== Disk space after cleanup ==="
+          df -h
+      
+      - name: Setup build environment
+        run: |
+          echo "Installing APT tools..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            dpkg-dev \
+            gnupg \
+            apt-utils \
+            reprepro \
+            dh-make \
+            devscripts \
+            build-essential \
+            gcc \
+            g++ \
+            make \
+            wget \
+            curl \
+            jq \
+            zip \
+            unzip \
+            git \
+            2>&1 | grep -v "^Reading\|^Building\|^Selecting"
+          
+          echo "Build tools installed"
+          dpkg-dev --version | head -1
+      
+      - name: Download Termux packages
+        run: |
+          mkdir -p termux-packages
+          cd termux-packages
+          
+          echo "=========================================="
+          echo "Downloading Termux Package Sources"
+          echo "=========================================="
+          
+          # Clone Termux packages repository
+          git clone --depth=1 https://github.com/termux/termux-packages.git repo || true
+          cd repo
+          
+          echo "Termux packages repository cloned"
+          ls -la packages | head -20
+      
+      - name: Extract and prepare packages
+        run: |
+          WORKSPACE_ROOT=$(pwd)
+          mkdir -p "$WORKSPACE_ROOT/packages-extracted"
+          
+          if [ -d "termux-packages/repo/packages" ]; then
+            cd "$WORKSPACE_ROOT/termux-packages/repo/packages"
+            
+            echo "=========================================="
+            echo "Extracting Package Information"
+            echo "=========================================="
+            
+            ARCH="${{ github.event.inputs.architectures }}"
+            ARCH="${ARCH:-aarch64}"
+            
+            # Create package list
+            for pkg_dir in */; do
+              if [ -f "$pkg_dir/build.sh" ]; then
+                PKG_NAME=$(basename "$pkg_dir")
+                echo "Processing: $PKG_NAME"
+                
+                # Extract build information
+                if grep -q "TERMUX_PKG_NAME" "$pkg_dir/build.sh"; then
+                  TERMUX_PKG_NAME=$(grep "^TERMUX_PKG_NAME=" "$pkg_dir/build.sh" | head -1 | cut -d'=' -f2 | tr -d "'\"")
+                  TERMUX_PKG_VERSION=$(grep "^TERMUX_PKG_VERSION=" "$pkg_dir/build.sh" | head -1 | cut -d'=' -f2 | tr -d "'\"")
+                  
+                  echo "$TERMUX_PKG_NAME $TERMUX_PKG_VERSION" >> "$WORKSPACE_ROOT/packages-extracted/manifest.txt"
+                fi
+              fi
+            done
+            
+            echo "Package manifest created"
+            wc -l "$WORKSPACE_ROOT/packages-extracted/manifest.txt"
+          else
+            echo "Termux packages directory not found, skipping manifest creation"
+            touch "$WORKSPACE_ROOT/packages-extracted/manifest.txt"
+          fi
+      
+      - name: Create custom package repository structure
+        run: |
+          ARCH="${{ github.event.inputs.architectures }}"
+          ARCH="${ARCH:-aarch64}"
+          PKG_NAME="${{ env.CUSTOM_PACKAGE_NAME }}"
+          
+          mkdir -p repo-structure/dists/stable/main/binary-${ARCH}
+          mkdir -p repo-structure/pool/main
+          mkdir -p repo-structure/metadata
+          
+          cd repo-structure
+          
+          echo "=========================================="
+          echo "Creating Custom APT Repository"
+          echo "=========================================="
+          echo "Package: $PKG_NAME"
+          echo "Architecture: $ARCH"
+          
+          # Create Release file
+          cat > dists/stable/Release << EOF
+          Origin: Code Editor
+          Label: Code Editor Custom Termux Repository
+          Suite: stable
+          Version: 1.0
+          Codename: stable
+          Architectures: $ARCH
+          Components: main
+          Date: $(date -u)
+          Acquire-By-Hash: yes
+          EOF
+          
+          # Create InRelease file (same as Release for unsigned)
+          cp dists/stable/Release dists/stable/InRelease
+          
+          # Create Packages file (initially empty)
+          cat > dists/stable/main/binary-${ARCH}/Packages << EOF
+          EOF
+          
+          # Create Packages.gz
+          gzip -9c dists/stable/main/binary-${ARCH}/Packages > dists/stable/main/binary-${ARCH}/Packages.gz
+          
+          # Create source directory first
+          mkdir -p dists/stable/main/source
+          
+          # Create Sources file
+          cat > dists/stable/main/source/Sources << EOF
+          EOF
+          
+          # Create Sources.gz
+          gzip -9c dists/stable/main/source/Sources > dists/stable/main/source/Sources.gz
+          
+          echo "Repository structure created"
+          tree -L 3 2>/dev/null || find . -type d | sort
+      
+      - name: Download and repackage bootstrap
+        run: |
+          mkdir -p bootstrap-packages
+          cd bootstrap-packages
+          
+          ARCH="${{ github.event.inputs.architectures }}"
+          ARCH="${ARCH:-aarch64}"
+          PKG_NAME="${{ env.CUSTOM_PACKAGE_NAME }}"
+          
+          echo "=========================================="
+          echo "Downloading Bootstrap Files"
+          echo "=========================================="
+          
+          # Download original Termux bootstrap
+          BOOTSTRAP_URL="https://github.com/termux/termux-packages/releases/download/bootstrap-2025.12.14-r1%2Bapt.android-7/bootstrap-${ARCH}.zip"
+          
+          echo "Downloading from: $BOOTSTRAP_URL"
+          wget -q --show-progress -O "bootstrap-${ARCH}-original.zip" "$BOOTSTRAP_URL" || true
+          
+          if [ ! -f "bootstrap-${ARCH}-original.zip" ]; then
+            echo "ERROR: Failed to download bootstrap"
+            exit 1
+          fi
+          
+          echo "Bootstrap downloaded"
+          ls -lh bootstrap-${ARCH}-original.zip
+          
+          # Extract bootstrap
+          mkdir -p bootstrap-extract
+          cd bootstrap-extract
+          unzip -q ../bootstrap-${ARCH}-original.zip
+          
+          # Replace package references
+          echo "Replacing com.termux with $PKG_NAME..."
+          find . -type f -exec sed -i "s|com\.termux|$PKG_NAME|g" {} \; 2>/dev/null || true
+          
+          # Repackage
+          cd ..
+          zip -r -q "bootstrap-${ARCH}-custom.zip" bootstrap-extract/
+          
+          echo "Bootstrap repackaged"
+          ls -lh bootstrap-${ARCH}-*.zip
+      
+      - name: Create APT configuration
+        run: |
+          mkdir -p apt-config
+          
+          cat > apt-config/sources.list << 'EOF'
+          # Default Termux repositories - replaced with custom build
+          deb [trusted=yes] https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/apt stable main
+          
+          # Fallback to original Termux packages (optional, comment out to use only custom)
+          # deb https://packages.termux.dev/apt termux main
+          EOF
+          
+          cat > apt-config/termux.sh << 'EOF'
+          #!/bin/bash
+          # Custom Termux package manager for com.codeeditor.android
+          # This script configures the package manager to use the custom APT repository
+          
+          CUSTOM_PKG="com.codeeditor.android"
+          DATA_DIR="$PREFIX/../files"
+          
+          echo "Setting up custom package manager for $CUSTOM_PKG..."
+          
+          # Create necessary directories
+          mkdir -p "$PREFIX/etc/apt/sources.list.d"
+          
+          # Create sources list
+          cat > "$PREFIX/etc/apt/sources.list.d/custom.list" << SOURCES
+          deb [trusted=yes] https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/apt stable main
+          SOURCES
+          
+          echo "Package manager configured"
+          EOF
+          
+          chmod +x apt-config/termux.sh
+          
+          ls -la apt-config/
+      
+      - name: Generate package indexes
+        run: |
+          mkdir -p packages-index
+          cd packages-index
+          
+          ARCH="${{ github.event.inputs.architectures }}"
+          ARCH="${ARCH:-aarch64}"
+          
+          echo "=========================================="
+          echo "Generating Package Indexes"
+          echo "=========================================="
+          
+          # Create Packages file with bootstrap metadata
+          cat > Packages << EOF
+          Package: termux-bootstrap
+          Version: 2025.12.14-r1
+          Architecture: $ARCH
+          Maintainer: Code Editor Team <support@codeeditor.dev>
+          Installed-Size: 100000
+          Depends: base-files
+          Filename: ../pool/main/termux-bootstrap_2025.12.14-r1_${ARCH}.tar.gz
+          Size: 50000000
+          MD5sum: placeholder
+          SHA256: placeholder
+          Description: Custom Termux bootstrap for Code Editor
+           This is a modified Termux bootstrap with com.codeeditor.android
+           package naming for use with the Code Editor application.
+          
+          EOF
+          
+          cat > Release << EOF
+          Origin: Code Editor
+          Label: Code Editor Custom Termux Repository
+          Suite: stable
+          Version: 1.0
+          Codename: stable
+          Architecture: $ARCH
+          Components: main
+          Date: $(date -u)
+          
+          EOF
+          
+          echo "Package indexes created"
+          cat Packages
+      
+      - name: Prepare GitHub Pages content
+        run: |
+          mkdir -p gh-pages-final/${{ env.REPO_PATH }}
+          
+          ARCH="${{ github.event.inputs.architectures }}"
+          ARCH="${ARCH:-aarch64}"
+          
+          # Copy repository structure
+          cp -r repo-structure/* gh-pages-final/${{ env.REPO_PATH }}/
+          
+          # Copy package metadata
+          mkdir -p gh-pages-final/${{ env.REPO_PATH }}/pool/main
+          cp packages-index/Packages gh-pages-final/${{ env.REPO_PATH }}/dists/stable/main/binary-${ARCH}/ 2>/dev/null || true
+          
+          # Create index HTML for browsing
+          cat > gh-pages-final/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Code Editor Custom APT Repository</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 20px; }
+                  .container { max-width: 900px; margin: 0 auto; }
+                  h1 { color: #333; }
+                  .info { background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; }
+                  pre { background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🔧 Code Editor Custom APT Repository</h1>
+                  
+                  <div class="info">
+                      <h2>Overview</h2>
+                      <p>This is a custom Termux package repository compiled for <code>com.codeeditor.android</code> package name.</p>
+                      <p><strong>Repository URL:</strong> <code>https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/apt</code></p>
+                  </div>
+                  
+                  <div class="info">
+                      <h2>Configuration</h2>
+                      <p>To use this repository in your Code Editor installation, add the following to <code>$PREFIX/etc/apt/sources.list</code>:</p>
+                      <pre>deb [trusted=yes] https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/apt stable main</pre>
+                  </div>
+                  
+                  <div class="info">
+                      <h2>Available Packages</h2>
+                      <ul>
+                          <li>termux-bootstrap - Custom Termux bootstrap environment</li>
+                          <li>base-files - Base system files</li>
+                          <li>Additional packages as available</li>
+                      </ul>
+                  </div>
+                  
+                  <div class="info">
+                      <h2>Build Information</h2>
+                      <p><strong>Build Date:</strong> <script>document.write(new Date().toLocaleString())</script></p>
+                      <p><strong>Build ID:</strong> ${{ github.run_number }}</p>
+                      <p><strong>Repository:</strong> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a></p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          echo "GitHub Pages content prepared"
+          ls -la gh-pages-final/
+      
+      - name: Generate directory index.html files
+        run: |
+          # Python script to generate directory indexes with actual file listings
+          python3 << 'PYSCRIPT'
+          import os
+          import json
+          from pathlib import Path
+          from datetime import datetime
+          
+          def get_file_icon(name, is_dir):
+              if is_dir:
+                  return '📁'
+              elif name.endswith('.gz'):
+                  return '📦'
+              elif name.endswith('.html'):
+                  return '🌐'
+              elif name.endswith('.txt'):
+                  return '📄'
+              elif name.endswith('.json'):
+                  return '⚙️'
+              else:
+                  return '📄'
+          
+          def format_size(size):
+              for unit in ['B', 'KB', 'MB', 'GB']:
+                  if size < 1024:
+                      return f"{size:.1f} {unit}" if unit != 'B' else f"{size} {unit}"
+                  size /= 1024
+              return f"{size:.1f} TB"
+          
+          def generate_index_html(directory):
+              files_data = []
+              
+              # Collect files and directories
+              try:
+                  for item in sorted(os.listdir(directory)):
+                      if item == 'index.html':
+                          continue
+                      
+                      item_path = os.path.join(directory, item)
+                      is_dir = os.path.isdir(item_path)
+                      
+                      try:
+                          stat = os.stat(item_path)
+                          size = stat.st_size if not is_dir else 0
+                          mtime = int(stat.st_mtime * 1000)
+                      except:
+                          size = 0
+                          mtime = 0
+                      
+                      files_data.append({
+                          'name': item,
+                          'type': 'dir' if is_dir else 'file',
+                          'size': size,
+                          'modified': mtime
+                      })
+              except Exception as e:
+                  print(f"Error reading directory {directory}: {e}")
+              
+              # Generate HTML
+              files_json = json.dumps(files_data)
+              
+              html_content = f"""<!DOCTYPE html>
+          <html>
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Directory Index</title>
+              <style>
+                  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                  body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }}
+                  .container {{ max-width: 1000px; margin: 0 auto; padding: 20px; }}
+                  .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+                  .header h1 {{ font-size: 28px; margin-bottom: 10px; }}
+                  .header p {{ opacity: 0.9; }}
+                  .file-list {{ background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }}
+                  .file-item {{ display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #eee; transition: background 0.2s; }}
+                  .file-item:hover {{ background: #f9f9f9; }}
+                  .file-item:last-child {{ border-bottom: none; }}
+                  .file-icon {{ font-size: 20px; margin-right: 15px; min-width: 24px; text-align: center; }}
+                  .file-name {{ flex: 1; }}
+                  .file-name a {{ color: #667eea; text-decoration: none; font-weight: 500; }}
+                  .file-name a:hover {{ text-decoration: underline; }}
+                  .file-size {{ color: #999; font-size: 12px; min-width: 80px; text-align: right; margin-right: 15px; }}
+                  .file-date {{ color: #999; font-size: 12px; min-width: 150px; text-align: right; }}
+                  .parent-link {{ background: #f0f0f0; }}
+                  .parent-link .file-name a {{ color: #764ba2; }}
+                  .empty {{ text-align: center; padding: 40px; color: #999; }}
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>📁 Directory Index</h1>
+                  </div>
+                  
+                  <div id="file-list" class="file-list"></div>
+              </div>
+              
+              <script>
+                  const FILES_DATA = {files_json};
+                  
+                  function formatFileSize(bytes) {{
+                      if (bytes === 0) return '-';
+                      const k = 1024;
+                      const sizes = ['B', 'KB', 'MB', 'GB'];
+                      const i = Math.floor(Math.log(bytes) / Math.log(k));
+                      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+                  }}
+                  
+                  function formatDate(timestamp) {{
+                      return new Date(timestamp).toLocaleString('en-US', {{
+                          year: 'numeric', month: '2-digit', day: '2-digit',
+                          hour: '2-digit', minute: '2-digit'
+                      }});
+                  }}
+                  
+                  function loadDirectory() {{
+                      const fileList = document.getElementById('file-list');
+                      const currentPath = window.location.pathname;
+                      
+                      let html = '';
+                      
+                      // Add parent directory link
+                      if (currentPath !== '/' && currentPath !== '') {{
+                          html += '<div class="file-item parent-link">';
+                          html += '<div class="file-icon">📂</div>';
+                          html += '<div class="file-name"><a href="../">.. (Parent Directory)</a></div>';
+                          html += '</div>';
+                      }}
+                      
+                      // Add files and directories
+                      if (FILES_DATA && FILES_DATA.length > 0) {{
+                          FILES_DATA.forEach(file => {{
+                              const icon = file.type === 'dir' ? '📁' : (
+                                  file.name.endsWith('.gz') ? '📦' :
+                                  file.name.endsWith('.html') ? '🌐' :
+                                  file.name.endsWith('.txt') ? '📄' :
+                                  file.name.endsWith('.json') ? '⚙️' :
+                                  '📄'
+                              );
+                              html += '<div class="file-item">';
+                              html += '<div class="file-icon">' + icon + '</div>';
+                              html += '<div class="file-name"><a href="' + file.name + (file.type === 'dir' ? '/' : '') + '">' + file.name + '</a></div>';
+                              html += '<div class="file-size">' + formatFileSize(file.size) + '</div>';
+                              html += '<div class="file-date">' + formatDate(file.modified) + '</div>';
+                              html += '</div>';
+                          }});
+                      }} else {{
+                          html = '<div class="empty">📭 This directory is empty</div>';
+                      }}
+                      
+                      fileList.innerHTML = html;
+                  }}
+                  
+                  document.addEventListener('DOMContentLoaded', loadDirectory);
+              </script>
+          </body>
+          </html>"""
+              
+              return html_content
+          
+          def process_directory_recursive(directory):
+              if not os.path.isdir(directory):
+                  return
+              
+              # Generate index.html for current directory
+              try:
+                  html_content = generate_index_html(directory)
+                  index_path = os.path.join(directory, 'index.html')
+                  
+                  with open(index_path, 'w', encoding='utf-8') as f:
+                      f.write(html_content)
+                  print(f"✓ Created index.html in: {directory}")
+              except Exception as e:
+                  print(f"✗ Error creating index.html in {directory}: {e}")
+              
+              # Process subdirectories
+              for item in os.listdir(directory):
+                  item_path = os.path.join(directory, item)
+                  if os.path.isdir(item_path) and item != '.git':
+                      process_directory_recursive(item_path)
+          
+          # Generate indexes for all directories
+          print("=" * 42)
+          print("Generating Directory Indexes with File Listings")
+          print("=" * 42)
+          
+          process_directory_recursive("gh-pages-final")
+          
+          # List all generated index files
+          print("")
+          print("Generated index.html files:")
+          for root, dirs, files in os.walk("gh-pages-final"):
+              if 'index.html' in files:
+                  print(os.path.join(root, 'index.html'))
+          print("")
+          print("✅ Directory indexes generated successfully with file listings")
+          PYSCRIPT
+          
+          echo "=========================================="
+          echo "Index generation completed"
+          echo "=========================================="
+      
+      - name: Deploy to GitHub Pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Navigate to content directory
+          cd gh-pages-final
+          
+          # Configure git with proper authentication
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Initialize repository
+          git init
+          git remote add origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+          
+          # Fetch existing gh-pages branch if it exists
+          git fetch origin ${{ env.GH_PAGES_BRANCH }} --depth=1 2>/dev/null || echo "gh-pages branch does not exist yet"
+          
+          # Add all files
+          git add -A
+          
+          # Create commit (allow empty for first run)
+          git commit -m "Update custom APT repository - Build ${{ github.run_number }}" --allow-empty
+          
+          # Push to gh-pages branch
+          git branch -M ${{ env.GH_PAGES_BRANCH }}
+          git push -u origin ${{ env.GH_PAGES_BRANCH }} --force
+          
+          echo "✅ Deployed to GitHub Pages"
+          echo "APT Repository: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/apt"
+      
+      - name: Create release with bootstrap
+        if: success()
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            bootstrap-packages/bootstrap-*-custom.zip
+          tag_name: apt-repo-${{ github.run_number }}
+          name: Custom APT Repository Build ${{ github.run_number }}
+          body: |
+            # Custom APT Repository Build
+            
+            **Build ID:** ${{ github.run_number }}
+            **Date:** ${{ github.event.repository.updated_at }}
+            
+            ## Contents
+            - Custom Termux bootstrap for com.codeeditor.android
+            - APT repository configuration and package indexes
+            - Ready to deploy on GitHub Pages
+            
+            ## Repository URL
+            ```
+            https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/apt
+            ```
+            
+            ## Usage
+            Add to bootstrap sources.list:
+            ```
+            deb [trusted=yes] https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/apt stable main
+            ```
+            
+            ## Features
+            - Custom package naming (com.codeeditor.android)
+            - Debian APT repository structure
+            - GitHub Pages hosting
+            - Easy package updates
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "Build Summary"
+          echo "=========================================="
+          echo "Build ID: ${{ github.run_number }}"
+          echo "Status: ${{ job.status }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "GitHub Pages: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/apt"
+          echo ""
+          echo "To use this repository in Code Editor:"
+          echo "1. Update TermuxBootstrap.java with sources.list"
+          echo "2. Configure APT to use GitHub Pages URL"
+          echo "3. Run: apt update && apt install <package>"

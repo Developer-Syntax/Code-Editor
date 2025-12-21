@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/action_save"
+        android:icon="@drawable/ic_save"
+        android:title="@string/action_save"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_find"
+        android:icon="@drawable/ic_search"
+        android:title="@string/action_find"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/action_more"
+        android:icon="@drawable/ic_more"
+        android:title="More"
+        app:showAsAction="always">
+        <menu>
+            <item
+                android:id="@+id/action_new"
+                android:icon="@drawable/ic_add"
+                android:title="@string/action_new" />
+
+            <item
+                android:id="@+id/action_open"
+                android:icon="@drawable/ic_folder"
+                android:title="@string/action_open" />
+
+            <item
+                android:id="@+id/action_save_as"
+                android:icon="@drawable/ic_save"
+                android:title="@string/action_save_as" />
+
+            <item
+                android:id="@+id/action_find_replace"
+                android:icon="@drawable/ic_find_replace"
+                android:title="@string/action_find_replace" />
+
+            <item
+                android:id="@+id/action_go_to_line"
+                android:icon="@drawable/ic_go_to_line"
+                android:title="@string/action_go_to_line" />
+
+            <item
+                android:id="@+id/action_undo"
+                android:icon="@drawable/ic_undo"
+                android:title="@string/action_undo" />
+
+            <item
+                android:id="@+id/action_redo"
+                android:icon="@drawable/ic_redo"
+                android:title="@string/action_redo" />
+
+            <item
+                android:id="@+id/action_settings"
+                android:icon="@drawable/ic_settings"
+                android:title="@string/action_settings" />
+            
+            <item
+                android:id="@+id/action_new_android_project"
+                android:icon="@drawable/ic_new_project"
+                android:title="New Android Project" />
+            
+            <item
+                android:id="@+id/action_build_apk"
+                android:icon="@drawable/ic_build"
+                android:title="Build APK" />
+            
+            <item
+                android:id="@+id/action_terminal"
+                android:icon="@drawable/ic_terminal"
+                android:title="Terminal" />
+        </menu>
+    </item>
+
+</menu>

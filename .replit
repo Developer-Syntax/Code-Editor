@@ -1,0 +1,29 @@
+modules = ["java-graalvm22.3", "bash"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Project Validation"
+
+[[workflows.workflow]]
+name = "Project Validation"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "./validate_project.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"

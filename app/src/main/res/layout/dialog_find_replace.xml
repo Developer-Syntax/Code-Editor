@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/find_replace"
+        android:textColor="@color/on_surface"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        app:boxBackgroundColor="@color/input_background"
+        app:boxCornerRadiusBottomEnd="8dp"
+        app:boxCornerRadiusBottomStart="8dp"
+        app:boxCornerRadiusTopEnd="8dp"
+        app:boxCornerRadiusTopStart="8dp"
+        app:startIconDrawable="@drawable/ic_search"
+        app:startIconTint="@color/hint_color">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etFind"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/find_hint"
+            android:inputType="text"
+            android:textColor="@color/on_surface"
+            android:textColorHint="@color/hint_color"
+            android:textSize="14sp" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        app:boxBackgroundColor="@color/input_background"
+        app:boxCornerRadiusBottomEnd="8dp"
+        app:boxCornerRadiusBottomStart="8dp"
+        app:boxCornerRadiusTopEnd="8dp"
+        app:boxCornerRadiusTopStart="8dp">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etReplace"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/replace_hint"
+            android:inputType="text"
+            android:textColor="@color/on_surface"
+            android:textColorHint="@color/hint_color"
+            android:textSize="14sp" />
+
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/cbCaseSensitive"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/case_sensitive"
+            android:textColor="@color/on_surface"
+            android:textSize="12sp" />
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/cbRegex"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="@string/regex"
+            android:textColor="@color/on_surface"
+            android:textSize="12sp" />
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/cbWholeWord"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="@string/whole_word"
+            android:textColor="@color/on_surface"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvMatchCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textColor="@color/secondary_text"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:gravity="end"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnFindPrev"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/find_prev"
+            app:icon="@drawable/ic_arrow_up" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnFindNext"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/find_next"
+            app:icon="@drawable/ic_arrow_down" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReplace"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/replace" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnReplaceAll"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/replace_all" />
+
+    </LinearLayout>
+
+</LinearLayout>

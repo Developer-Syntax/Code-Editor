@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#0078D4</color>
+    <color name="primary_variant">#106EBE</color>
+    <color name="primary_dark">#005A9E</color>
+    <color name="secondary">#00B7C3</color>
+    <color name="secondary_variant">#008B94</color>
+    <color name="background">#0D1117</color>
+    <color name="surface">#161B22</color>
+    <color name="surface_elevated">#21262D</color>
+    <color name="error">#F85149</color>
+    <color name="success">#3FB950</color>
+    <color name="warning">#D29922</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_secondary">#FFFFFF</color>
+    <color name="on_background">#E6EDF3</color>
+    <color name="on_surface">#E6EDF3</color>
+    <color name="on_error">#FFFFFF</color>
+    
+    <color name="editor_background">#0D1117</color>
+    <color name="editor_text">#E6EDF3</color>
+    <color name="line_number_background">#0D1117</color>
+    <color name="line_number_text">#6E7681</color>
+    <color name="current_line">#161B22</color>
+    <color name="selection">#264F78</color>
+    <color name="cursor">#58A6FF</color>
+    
+    <color name="syntax_keyword">#FF7B72</color>
+    <color name="syntax_string">#A5D6FF</color>
+    <color name="syntax_number">#79C0FF</color>
+    <color name="syntax_comment">#8B949E</color>
+    <color name="syntax_function">#D2A8FF</color>
+    <color name="syntax_class">#7EE787</color>
+    <color name="syntax_variable">#FFA657</color>
+    <color name="syntax_operator">#E6EDF3</color>
+    <color name="syntax_annotation">#D2A8FF</color>
+    <color name="syntax_tag">#7EE787</color>
+    <color name="syntax_attribute">#79C0FF</color>
+    
+    <color name="activity_bar">#010409</color>
+    <color name="activity_icon">#6E7681</color>
+    <color name="activity_icon_active">#E6EDF3</color>
+    
+    <color name="sidebar">#010409</color>
+    <color name="sidebar_title">#E6EDF3</color>
+    <color name="sidebar_section">#161B22</color>
+    <color name="sidebar_hover">#21262D</color>
+    
+    <color name="tabs_background">#010409</color>
+    <color name="tab_active">#0D1117</color>
+    <color name="tab_inactive">#010409</color>
+    <color name="tab_text">#E6EDF3</color>
+    <color name="tab_text_inactive">#8B949E</color>
+    <color name="tab_close">#8B949E</color>
+    <color name="tab_indicator">#0078D4</color>
+    <color name="tab_border">#30363D</color>
+    
+    <color name="toolbar_background">#010409</color>
+    <color name="toolbar_border">#21262D</color>
+    <color name="status_bar">#0078D4</color>
+    <color name="status_text">#FFFFFF</color>
+    
+    <color name="file_tree_text">#E6EDF3</color>
+    <color name="file_tree_text_secondary">#8B949E</color>
+    <color name="input_background">#21262D</color>
+    <color name="input_border">#30363D</color>
+    <color name="input_focus_border">#58A6FF</color>
+    <color name="hint_color">#6E7681</color>
+    <color name="link_color">#58A6FF</color>
+    <color name="secondary_text">#8B949E</color>
+    <color name="border_color">#30363D</color>
+    <color name="branch_bg">#238636</color>
+    <color name="branch_text">#FFFFFF</color>
+    
+    <color name="current_line_highlight">#161B22</color>
+    <color name="matching_bracket">#58A6FF</color>
+    <color name="search_highlight">#533D10</color>
+    <color name="diff_added">#1B4721</color>
+    <color name="diff_removed">#5D1A1A</color>
+    <color name="diff_added_text">#3FB950</color>
+    <color name="diff_removed_text">#F85149</color>
+    
+    <color name="symbol_toolbar_background">#161B22</color>
+    <color name="symbol_text">#E6EDF3</color>
+    <color name="symbol_button_background">#21262D</color>
+    <color name="symbol_button_pressed">#30363D</color>
+    <color name="divider">#21262D</color>
+    
+    <color name="keyword_icon">#FF7B72</color>
+    <color name="function_icon">#D2A8FF</color>
+    <color name="variable_icon">#FFA657</color>
+    <color name="class_icon">#7EE787</color>
+    <color name="snippet_icon">#F0883E</color>
+    
+    <color name="autocomplete_background">#161B22</color>
+    <color name="autocomplete_selected">#0D419D</color>
+    <color name="autocomplete_border">#30363D</color>
+    
+    <color name="fab_background">#238636</color>
+    <color name="fab_icon">#FFFFFF</color>
+    <color name="fab_ripple">#3FB950</color>
+    
+    <color name="quick_action_background">#21262D</color>
+    <color name="quick_action_text">#E6EDF3</color>
+    
+    <color name="terminal_toolbar_bg">#0D1117</color>
+    <color name="terminal_background">#0D1117</color>
+    <color name="terminal_foreground">#E6EDF3</color>
+    <color name="terminal_cursor">#58A6FF</color>
+    
+    <color name="card_background">#161B22</color>
+    <color name="card_border">#30363D</color>
+    <color name="ripple_color">#30363D</color>
+    
+    <color name="button_primary">#238636</color>
+    <color name="button_primary_hover">#2EA043</color>
+    <color name="button_secondary">#21262D</color>
+    <color name="button_secondary_hover">#30363D</color>
+    <color name="button_danger">#DA3633</color>
+</resources>

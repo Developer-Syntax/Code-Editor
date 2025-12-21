@@ -1,0 +1,335 @@
+name: Build Custom Termux Bootstrap (Aggressive Mode)
+
+on:
+  workflow_dispatch:
+    inputs:
+      architectures:
+        description: 'Architecture to build (aarch64, arm, i686, x86_64)'
+        required: false
+        default: 'aarch64'
+      additional_packages:
+        description: 'Additional packages (comma-separated)'
+        required: false
+        default: ''
+      create_release:
+        description: 'Create GitHub release and upload (true/false)'
+        required: false
+        default: 'true'
+
+env:
+  CUSTOM_PACKAGE_NAME: com.codeeditor.android
+
+jobs:
+  build-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+    permissions:
+      contents: write
+      id-token: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Free disk space
+        run: |
+          echo "=== Disk space before cleanup ==="
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo rm -rf /usr/local/share/boost /usr/share/swift || true
+          echo "=== Disk space after cleanup ==="
+          df -h
+      
+      - name: Clone termux-packages repository
+        run: |
+          git clone --depth=1 https://github.com/termux/termux-packages.git termux-packages
+          cd termux-packages
+          echo "Cloned commit: $(git rev-parse HEAD)"
+      
+      - name: AGGRESSIVE - Replace ALL com.termux in ENTIRE repository
+        run: |
+          cd termux-packages
+          PKG_NAME="${{ env.CUSTOM_PACKAGE_NAME }}"
+          
+          echo "============================================================"
+          echo "AGGRESSIVE MODE: Replacing ALL com.termux -> $PKG_NAME"
+          echo "============================================================"
+          
+          echo ""
+          echo "=== Before: Total com.termux occurrences in ALL files ==="
+          BEFORE_COUNT=$(grep -r "com\.termux" . 2>/dev/null | wc -l || echo "0")
+          echo "Total: $BEFORE_COUNT"
+          
+          echo ""
+          echo "=== Step 1: Replace in ALL text files ==="
+          
+          find . -type f \( \
+            -name "*.sh" \
+            -o -name "*.txt" \
+            -o -name "*.md" \
+            -o -name "*.json" \
+            -o -name "*.yaml" \
+            -o -name "*.yml" \
+            -o -name "*.py" \
+            -o -name "*.pl" \
+            -o -name "*.conf" \
+            -o -name "*.cfg" \
+            -o -name "*.ini" \
+            -o -name "*.properties" \
+            -o -name "*.subpackage.sh" \
+            -o -name "PKGBUILD" \
+            -o -name "Makefile" \
+            -o -name "*.mk" \
+            -o -name "*.patch" \
+            -o -name "*.diff" \
+          \) -exec sed -i "s|com\.termux|$PKG_NAME|g" {} \; 2>/dev/null || true
+          
+          echo "Text files patched."
+          
+          echo ""
+          echo "=== Step 2: Replace in files without extension ==="
+          
+          find . -type f ! -name "*.*" -exec sh -c '
+            if file "$1" | grep -q "text"; then
+              sed -i "s|com\.termux|'"$PKG_NAME"'|g" "$1" 2>/dev/null || true
+            fi
+          ' _ {} \; 2>/dev/null || true
+          
+          echo "Extensionless text files patched."
+          
+          echo ""
+          echo "=== Step 3: Force replace in critical directories ==="
+          
+          for dir in scripts packages ndk-patches; do
+            if [ -d "$dir" ]; then
+              echo "Processing $dir/..."
+              find "$dir" -type f -exec sed -i "s|com\.termux|$PKG_NAME|g" {} \; 2>/dev/null || true
+            fi
+          done
+          
+          echo "Critical directories patched."
+          
+          echo ""
+          echo "=== After: Total com.termux occurrences remaining ==="
+          AFTER_COUNT=$(grep -r "com\.termux" . 2>/dev/null | wc -l || echo "0")
+          echo "Remaining: $AFTER_COUNT"
+          
+          if [ "$AFTER_COUNT" -gt 0 ]; then
+            echo ""
+            echo "=== Remaining locations (showing first 30): ==="
+            grep -r "com\.termux" . 2>/dev/null | head -30
+          fi
+          
+          echo ""
+          echo "=== Verifying $PKG_NAME occurrences ==="
+          NEW_COUNT=$(grep -r "$PKG_NAME" . 2>/dev/null | wc -l || echo "0")
+          echo "Total $PKG_NAME: $NEW_COUNT"
+          
+          echo ""
+          echo "=== Key file verification ==="
+          echo "properties.sh:"
+          grep -E "TERMUX.*PACKAGE|PREFIX|DATA_DIR" scripts/properties.sh 2>/dev/null | head -10
+          
+          echo ""
+          echo "AGGRESSIVE patching complete!"
+          echo "Replaced: $((BEFORE_COUNT - AFTER_COUNT)) occurrences"
+      
+      - name: Fix bzip2 subpackage issue
+        run: |
+          cd termux-packages
+          
+          echo "=== Fixing bzip2 subpackage issue (GitHub issue #27093) ==="
+          
+          BOOTSTRAP_SCRIPT="scripts/build-bootstraps.sh"
+          
+          if [ -f "$BOOTSTRAP_SCRIPT" ]; then
+            sed -i 's/\bbzip2\b/libbz2/g' "$BOOTSTRAP_SCRIPT"
+            echo "bzip2 -> libbz2 replacement done!"
+          fi
+      
+      - name: Build bootstrap using Docker
+        run: |
+          cd termux-packages
+          
+          ARCH="${{ github.event.inputs.architectures }}"
+          ARCH="${ARCH:-aarch64}"
+          ADDITIONAL="${{ github.event.inputs.additional_packages }}"
+          
+          echo "=========================================="
+          echo "Building Termux Bootstrap (AGGRESSIVE)"
+          echo "Package: ${{ env.CUSTOM_PACKAGE_NAME }}"
+          echo "Architecture: $ARCH"
+          echo "Additional packages: ${ADDITIONAL:-none}"
+          echo "=========================================="
+          echo ""
+          echo "This may take 2-6 hours..."
+          echo ""
+          
+          BUILD_ARGS="--architectures $ARCH"
+          if [ -n "$ADDITIONAL" ]; then
+            ADDITIONAL_FORMATTED=$(echo "$ADDITIONAL" | tr ',' ' ')
+            BUILD_ARGS="$BUILD_ARGS --add $ADDITIONAL_FORMATTED"
+          fi
+          
+          echo "Running: ./scripts/run-docker.sh ./scripts/build-bootstraps.sh $BUILD_ARGS"
+          echo ""
+          
+          ./scripts/run-docker.sh ./scripts/build-bootstraps.sh $BUILD_ARGS 2>&1 | tee build.log
+          
+          BUILD_EXIT_CODE=${PIPESTATUS[0]}
+          
+          if [ $BUILD_EXIT_CODE -ne 0 ]; then
+            echo ""
+            echo "BUILD FAILED (exit code: $BUILD_EXIT_CODE)"
+            echo ""
+            echo "=== Last 500 lines of build log ==="
+            tail -500 build.log
+            exit 1
+          fi
+          
+          echo ""
+          echo "BUILD COMPLETED SUCCESSFULLY"
+      
+      - name: Extract and repackage bootstrap
+        run: |
+          cd termux-packages
+          ARCH="${{ github.event.inputs.architectures }}"
+          ARCH="${ARCH:-aarch64}"
+          PKG_NAME="${{ env.CUSTOM_PACKAGE_NAME }}"
+          
+          echo "=========================================="
+          echo "Post-Processing Bootstrap"
+          echo "=========================================="
+          
+          mkdir -p ../output/bootstrap-extract
+          
+          # Find original bootstrap file (look in current directory first)
+          if [ -f "bootstrap-${ARCH}.zip" ]; then
+            BOOTSTRAP_ZIP="bootstrap-${ARCH}.zip"
+          else
+            BOOTSTRAP_ZIP=$(find . -name "bootstrap-${ARCH}.zip" -type f | grep -v bootstrap-extract | head -1)
+          fi
+          
+          if [ -z "$BOOTSTRAP_ZIP" ] || [ ! -f "$BOOTSTRAP_ZIP" ]; then
+            echo "ERROR: bootstrap-${ARCH}.zip not found!"
+            echo "Searching in current directory:"
+            ls -la *.zip 2>/dev/null || echo "No zip files found"
+            echo "Searching recursively:"
+            find . -name "bootstrap-*.zip" -type f 2>/dev/null | head -10
+            exit 1
+          fi
+          
+          echo "Found bootstrap: $BOOTSTRAP_ZIP"
+          BOOTSTRAP_ZIP_ABS=$(cd "$(dirname "$BOOTSTRAP_ZIP")" && pwd -P)/$(basename "$BOOTSTRAP_ZIP")
+          
+          # Extract bootstrap
+          echo "Extracting bootstrap from: $BOOTSTRAP_ZIP_ABS"
+          cd ../output/bootstrap-extract
+          unzip -q "$BOOTSTRAP_ZIP_ABS"
+          
+          # Replace all com.termux references in extracted files
+          echo "Replacing com.termux references in extracted files..."
+          find . -type f -exec sed -i "s|com\.termux|$PKG_NAME|g" {} \; 2>/dev/null || true
+          
+          # Verify replacements
+          REMAINING=$(grep -r "com\.termux" . 2>/dev/null | wc -l || echo "0")
+          if [ "$REMAINING" -gt 0 ]; then
+            echo "WARNING: Still found $REMAINING com.termux references"
+            grep -r "com\.termux" . 2>/dev/null | head -10
+          else
+            echo "SUCCESS: All com.termux references replaced!"
+          fi
+          
+          # Repackage bootstrap with new name
+          CUSTOM_BOOTSTRAP_ZIP="../bootstrap-${ARCH}-custom.zip"
+          echo "Repackaging bootstrap as custom version..."
+          zip -r -q "$CUSTOM_BOOTSTRAP_ZIP" .
+          
+          echo "Repackaged: $CUSTOM_BOOTSTRAP_ZIP"
+          ls -lh "$CUSTOM_BOOTSTRAP_ZIP"
+          
+          # Clean up extraction directory
+          cd ..
+          rm -rf bootstrap-extract
+      
+      - name: Collect and organize output
+        run: |
+          cd output
+          
+          echo "=========================================="
+          echo "Output Files"
+          echo "=========================================="
+          
+          ARCH="${{ github.event.inputs.architectures }}"
+          ARCH="${ARCH:-aarch64}"
+          
+          # Copy original bootstrap for comparison
+          cp ../termux-packages/bootstrap-${ARCH}.zip ./bootstrap-${ARCH}-original.zip 2>/dev/null || true
+          
+          # List all files
+          echo ""
+          echo "=== Output directory contents ==="
+          ls -lah
+          
+          # Create a manifest file
+          echo "Creating manifest file..."
+          cat > MANIFEST.txt << EOF
+          Bootstrap Build Information
+          ============================
+          Architecture: $ARCH
+          Custom Package: ${{ env.CUSTOM_PACKAGE_NAME }}
+          Build Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          
+          Files:
+          - bootstrap-${ARCH}-custom.zip: Custom bootstrap with com.codeeditor.android package name
+          - bootstrap-${ARCH}-original.zip: Original bootstrap for reference (if available)
+          
+          Usage:
+          Use bootstrap-${ARCH}-custom.zip in the application.
+          Upload to GitHub Releases and update the download URL in TermuxBootstrap.java
+          EOF
+          
+          cat MANIFEST.txt
+      
+      - name: Create GitHub Release (Fixed)
+        if: ${{ github.event.inputs.create_release == 'true' }}
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: output/bootstrap-${{ github.event.inputs.architectures || 'aarch64' }}-custom.zip
+          tag_name: bootstrap-custom-${{ env.CUSTOM_PACKAGE_NAME }}-${{ github.run_number }}
+          release_name: Custom Termux Bootstrap - ${{ env.CUSTOM_PACKAGE_NAME }}
+          overwrite: true
+          prerelease: false
+          body: |
+            # Custom Termux Bootstrap
+            
+            **Package:** ${{ env.CUSTOM_PACKAGE_NAME }}
+            **Architecture:** ${{ github.event.inputs.architectures || 'aarch64' }}
+            **Build ID:** ${{ github.run_number }}
+            
+            ## Files
+            - **bootstrap-*-custom.zip**: Custom bootstrap with all com.termux references replaced with com.codeeditor.android
+            
+            ## Usage
+            Update the `BOOTSTRAP_URL` in `app/src/main/java/com/codeeditor/android/utils/TermuxBootstrap.java` with the download URL of the custom bootstrap file.
+            
+            Example:
+            ```
+            https://github.com/${{ github.repository }}/releases/download/bootstrap-custom-${{ env.CUSTOM_PACKAGE_NAME }}-${{ github.run_number }}/bootstrap-aarch64-custom.zip
+            ```
+      
+      - name: Upload bootstrap artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: termux-bootstrap-custom-${{ env.CUSTOM_PACKAGE_NAME }}
+          path: output/
+          retention-days: 90
+      
+      - name: Upload build log (always)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-log-custom
+          path: termux-packages/build.log
+          retention-days: 14

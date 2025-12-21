@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    
+    <item
+        android:id="@+id/action_new_project"
+        android:title="New Android Project"
+        android:icon="@drawable/ic_new_project"
+        app:showAsAction="never" />
+    
+    <item
+        android:id="@+id/action_build_project"
+        android:title="Build APK"
+        android:icon="@drawable/ic_build"
+        app:showAsAction="never" />
+    
+    <item
+        android:id="@+id/action_open_project"
+        android:title="Open Project"
+        android:icon="@drawable/ic_folder_open"
+        app:showAsAction="never" />
+        
+</menu>

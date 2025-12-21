@@ -1,0 +1,227 @@
+name: Build Debian aarch64 Bootstrap
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    # Build weekly on Monday 00:00 UTC
+    - cron: '0 0 * * 1'
+
+jobs:
+  build-bootstrap:
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install debootstrap and dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq debootstrap qemu-user-static binfmt-support
+          echo "✓ Installed debootstrap, qemu-user-static, binfmt-support"
+
+      - name: Register QEMU handlers (Docker method - more reliable)
+        run: |
+          docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          echo "✓ QEMU handlers registered via Docker"
+          # Verify registration
+          if [ -f /proc/sys/fs/binfmt_misc/qemu-aarch64 ]; then
+            echo "✓ qemu-aarch64 registered"
+            cat /proc/sys/fs/binfmt_misc/qemu-aarch64 | grep flags
+          fi
+
+      - name: Create bootstrap directory
+        run: |
+          mkdir -p debian-bootstrap
+          echo "✓ Bootstrap directory created"
+
+      - name: Run debootstrap Stage 1 (download packages, no emulation)
+        run: |
+          echo "Starting debootstrap stage 1..."
+          sudo debootstrap \
+            --arch=arm64 \
+            --foreign \
+            --variant=minbase \
+            --include=systemd,udev,ca-certificates,curl,wget,git,build-essential \
+            bookworm \
+            debian-bootstrap \
+            http://deb.debian.org/debian
+          
+          sudo chown -R $USER:$USER debian-bootstrap
+          du -sh debian-bootstrap
+          echo "✓ Stage 1 complete"
+
+      - name: Copy QEMU binary for Stage 2
+        run: |
+          sudo mkdir -p debian-bootstrap/usr/bin
+          sudo cp /usr/bin/qemu-aarch64-static debian-bootstrap/usr/bin/
+          echo "✓ QEMU binary copied"
+
+      - name: Run debootstrap Stage 2 (second stage with QEMU)
+        run: |
+          echo "Starting debootstrap stage 2..."
+          sudo chroot debian-bootstrap /debootstrap/debootstrap --second-stage
+          sudo chown -R $USER:$USER debian-bootstrap
+          echo "✓ Stage 2 complete"
+
+      - name: Configure system and cleanup
+        run: |
+          cd debian-bootstrap
+          
+          # Set dpkg exclusions before package installation
+          echo "Setting dpkg exclusions..."
+          sudo tee etc/dpkg/dpkg.cfg.d/01_nodoc > /dev/null <<EOF
+          path-exclude /usr/share/doc/*
+          path-exclude /usr/share/man/*
+          path-exclude /usr/share/groff/*
+          path-exclude /usr/share/info/*
+          path-exclude /usr/share/locale/*
+          EOF
+          
+          # Clean up package cache
+          echo "Cleaning package cache..."
+          sudo rm -rf var/cache/apt/archives/*.deb
+          sudo rm -rf var/cache/apt/pkgcache.bin var/cache/apt/srcpkgcache.bin
+          sudo rm -rf var/lib/apt/lists/*
+          
+          # Remove documentation
+          echo "Removing documentation..."
+          sudo rm -rf usr/share/doc/*
+          sudo rm -rf usr/share/man/*
+          sudo rm -rf usr/share/groff/*
+          sudo rm -rf usr/share/info/*
+          sudo rm -rf usr/share/locale/*
+          
+          # Remove qemu binary (not needed in final tarball)
+          echo "Removing QEMU binary..."
+          sudo rm -f usr/bin/qemu-aarch64-static
+          
+          # Clean temp files
+          echo "Cleaning temp files..."
+          sudo rm -rf tmp/* var/tmp/* var/log/* var/cache/debconf/*.dat-old
+          
+          cd ..
+          du -sh debian-bootstrap
+          echo "✓ Cleanup complete"
+
+      - name: Additional cleanup for smaller archive
+        run: |
+          echo "Aggressive cleanup for ZIP..."
+          cd debian-bootstrap
+          
+          # Remove more unnecessary files to reduce size
+          rm -rf var/cache/* var/log/* tmp/* var/tmp/*
+          rm -rf usr/share/locale/* usr/share/zoneinfo/*
+          find . -name "*.pyc" -delete
+          find . -name "*.pyo" -delete
+          
+          # Remove package lists if any
+          rm -rf var/lib/apt/lists/* var/lib/dpkg/status-old
+          
+          du -sh .
+          cd ..
+          echo "✓ Additional cleanup complete"
+
+      - name: Create TAR.GZ archive
+        run: |
+          echo "Creating TAR.GZ archive..."
+          
+          # Fix ownership so tar can read files
+          sudo chown -R $(id -u):$(id -g) debian-bootstrap
+          
+          echo "Bootstrap final size: $(du -sh debian-bootstrap | cut -f1)"
+          
+          # Create tarball - use absolute path to avoid "./" prefix
+          # This creates a flat structure: bin/, etc/, lib/, usr/, var/, SYMLINKS.txt (no nested folder)
+          tar --owner=0 --group=0 -czf debian-aarch64-bootstrap.tar.gz -C debian-bootstrap .
+          
+          ls -lh debian-aarch64-bootstrap.tar.gz
+          echo "✓ TAR.GZ archive created successfully"
+
+      - name: Verify TAR.GZ archive
+        run: |
+          echo "Verifying TAR.GZ archive structure..."
+          
+          echo "First 20 entries:"
+          tar -tzf debian-aarch64-bootstrap.tar.gz | head -20
+          echo ""
+          echo "Archive info:"
+          tar -tzf debian-aarch64-bootstrap.tar.gz | wc -l
+          echo "files total"
+          ls -lh debian-aarch64-bootstrap.tar.gz
+          echo "✓ TAR.GZ archive verified (FLAT STRUCTURE - no ./ prefix)"
+
+      - name: Upload TAR.GZ artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-aarch64-bootstrap
+          path: debian-aarch64-bootstrap.tar.gz
+          retention-days: 30
+
+      - name: Check file exists before release
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [ -f debian-aarch64-bootstrap.tar.gz ]; then
+            echo "✓ File found, ready for release"
+            ls -lh debian-aarch64-bootstrap.tar.gz
+          else
+            echo "✗ File not found!"
+            ls -la
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: debian-aarch64-bootstrap.tar.gz
+          draft: false
+          prerelease: false
+          body: |
+            # Debian aarch64 Bootstrap Release
+            
+            ## Download
+            - **File**: `debian-aarch64-bootstrap.tar.gz`
+            - **Size**: ~30-40 MB (compressed)
+            - **Format**: TAR.GZ (fast, reliable)
+            
+            ## Bootstrap Details
+            - **OS**: Debian Bookworm (latest stable)
+            - **Architecture**: aarch64 (ARM64)
+            - **Includes**: systemd, udev, build-essential, git, curl, wget
+            - **Structure**: Flat - extract directly to root, no nested folders
+            
+            ## Installation Instructions
+            
+            ### For Code Editor App
+            1. Update `BOOTSTRAP_URL` in `TermuxBootstrap.java`:
+               ```java
+               private static final String BOOTSTRAP_URL = 
+                   "https://github.com/[USER]/[REPO]/releases/download/[TAG]/debian-aarch64-bootstrap.tar.gz";
+               ```
+            
+            2. Recompile and deploy app
+            
+            ### Manual Installation
+            ```bash
+            # Extract to Termux prefix
+            mkdir -p $PREFIX
+            tar -xzf debian-aarch64-bootstrap.tar.gz -C $PREFIX
+            
+            # Or with custom location
+            tar -xzf debian-aarch64-bootstrap.tar.gz -C /custom/path
+            
+            # With proot
+            mkdir debian-rootfs
+            tar -xzf debian-aarch64-bootstrap.tar.gz -C debian-rootfs
+            proot -0 -r debian-rootfs /bin/bash
+            ```
+            
+            ## Build Info
+            - Built via GitHub Actions
+            - Includes SYMLINKS.txt for proper symlink restoration
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

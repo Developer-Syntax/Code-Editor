@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="@string/pref_category_editor"
+        app:iconSpaceReserved="false">
+
+        <ListPreference
+            android:defaultValue="14"
+            android:entries="@array/font_sizes"
+            android:entryValues="@array/font_size_values"
+            android:key="font_size"
+            android:title="@string/pref_font_size"
+            android:summary="%s sp"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:defaultValue="4"
+            android:entries="@array/tab_sizes"
+            android:entryValues="@array/tab_size_values"
+            android:key="tab_size"
+            android:title="@string/pref_tab_size"
+            android:summary="%s spaces"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="auto_indent"
+            android:title="@string/pref_auto_indent"
+            android:summary="@string/pref_auto_indent_summary"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="auto_bracket"
+            android:title="@string/pref_auto_bracket"
+            android:summary="@string/pref_auto_bracket_summary"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="line_numbers"
+            android:title="@string/pref_line_numbers"
+            android:summary="@string/pref_line_numbers_summary"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="word_wrap"
+            android:title="@string/pref_word_wrap"
+            android:summary="@string/pref_word_wrap_summary"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="highlight_current_line"
+            android:title="@string/pref_highlight_line"
+            android:summary="@string/pref_highlight_line_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/pref_category_appearance"
+        app:iconSpaceReserved="false">
+
+        <ListPreference
+            android:defaultValue="dark"
+            android:entries="@array/themes"
+            android:entryValues="@array/theme_values"
+            android:key="theme"
+            android:title="@string/pref_theme"
+            android:summary="%s"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:defaultValue="monospace"
+            android:entries="@array/fonts"
+            android:entryValues="@array/font_values"
+            android:key="font_family"
+            android:title="@string/pref_font_family"
+            android:summary="%s"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/pref_category_autosave"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="auto_save"
+            android:title="@string/pref_auto_save"
+            android:summary="@string/pref_auto_save_summary"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:defaultValue="30"
+            android:dependency="auto_save"
+            android:entries="@array/auto_save_intervals"
+            android:entryValues="@array/auto_save_interval_values"
+            android:key="auto_save_interval"
+            android:title="@string/pref_auto_save_interval"
+            android:summary="%s"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/pref_category_keyboard"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="show_keyboard_shortcuts"
+            android:title="@string/pref_keyboard_shortcuts"
+            android:summary="@string/pref_keyboard_shortcuts_summary"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="vim_mode"
+            android:title="@string/pref_vim_mode"
+            android:summary="@string/pref_vim_mode_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/pref_category_about"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="version"
+            android:title="@string/pref_version"
+            android:summary="2.0"
+            app:iconSpaceReserved="false" />
+
+        <Preference
+            android:key="github"
+            android:title="@string/pref_github"
+            android:summary="@string/pref_github_summary"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

@@ -1,0 +1,53 @@
+name: Enable GitHub Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - '.github/workflows/build-apt-repository.yml'
+
+jobs:
+  setup-pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup GitHub Pages
+        run: |
+          echo "Setting up GitHub Pages configuration..."
+          
+          # Create .github directory if it doesn't exist
+          mkdir -p .github
+          
+          # Create a simple GitHub Pages config
+          cat > .github/pages.yml << 'EOF'
+          # GitHub Pages configuration
+          # Pages will serve from gh-pages branch at /apt path
+          EOF
+          
+          echo "GitHub Pages configuration created"
+      
+      - name: Configure gh-pages branch
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          
+          # Try to create gh-pages branch if it doesn't exist
+          git fetch origin gh-pages 2>/dev/null || {
+            echo "Creating gh-pages branch..."
+            git checkout --orphan gh-pages
+            git rm -rf .
+            echo "# APT Repository" > README.md
+            git add README.md
+            git commit -m "Initial gh-pages commit"
+            git push origin gh-pages
+          }
+          
+          echo "gh-pages branch ready"

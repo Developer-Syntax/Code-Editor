@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="font_sizes">
+        <item>10 sp</item>
+        <item>12 sp</item>
+        <item>14 sp</item>
+        <item>16 sp</item>
+        <item>18 sp</item>
+        <item>20 sp</item>
+        <item>22 sp</item>
+        <item>24 sp</item>
+    </string-array>
+
+    <string-array name="font_size_values">
+        <item>10</item>
+        <item>12</item>
+        <item>14</item>
+        <item>16</item>
+        <item>18</item>
+        <item>20</item>
+        <item>22</item>
+        <item>24</item>
+    </string-array>
+
+    <string-array name="tab_sizes">
+        <item>2 spaces</item>
+        <item>4 spaces</item>
+        <item>8 spaces</item>
+    </string-array>
+
+    <string-array name="tab_size_values">
+        <item>2</item>
+        <item>4</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="themes">
+        <item>Dark (Default)</item>
+        <item>Light</item>
+        <item>Solarized Dark</item>
+        <item>Solarized Light</item>
+        <item>Monokai</item>
+        <item>GitHub Dark</item>
+        <item>Dracula</item>
+        <item>One Dark</item>
+    </string-array>
+
+    <string-array name="theme_values">
+        <item>dark</item>
+        <item>light</item>
+        <item>solarized_dark</item>
+        <item>solarized_light</item>
+        <item>monokai</item>
+        <item>github_dark</item>
+        <item>dracula</item>
+        <item>one_dark</item>
+    </string-array>
+
+    <string-array name="fonts">
+        <item>Monospace</item>
+        <item>JetBrains Mono</item>
+        <item>Fira Code</item>
+        <item>Source Code Pro</item>
+        <item>Roboto Mono</item>
+    </string-array>
+
+    <string-array name="font_values">
+        <item>monospace</item>
+        <item>jetbrains_mono</item>
+        <item>fira_code</item>
+        <item>source_code_pro</item>
+        <item>roboto_mono</item>
+    </string-array>
+
+    <string-array name="auto_save_intervals">
+        <item>15 seconds</item>
+        <item>30 seconds</item>
+        <item>1 minute</item>
+        <item>2 minutes</item>
+        <item>5 minutes</item>
+    </string-array>
+
+    <string-array name="auto_save_interval_values">
+        <item>15</item>
+        <item>30</item>
+        <item>60</item>
+        <item>120</item>
+        <item>300</item>
+    </string-array>
+</resources>
