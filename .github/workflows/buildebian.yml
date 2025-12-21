@@ -169,12 +169,16 @@ jobs:
           echo "Bootstrap final size: $(du -sh debian-bootstrap | cut -f1)"
           
           # Create tarball with FLAT structure
-          # --transform strips leading ./ from all paths
-          # Result: bin/, etc/, lib/, usr/, var/, SYMLINKS.txt (NOT ./bin/, ./etc/, etc.)
-          tar --owner=0 --group=0 \
-              --transform='s,^\./,,' \
-              -czf debian-aarch64-bootstrap.tar.gz \
-              -C debian-bootstrap .
+          # Solution: Use -C to change to directory, then explicitly list items (not ".")
+          # This prevents "." and "./" from appearing in the archive
+          cd debian-bootstrap
+          
+          # Get all top-level items (files and directories)
+          items=$(ls -1A | paste -sd ' ')
+          
+          # Create archive from parent directory
+          tar --owner=0 --group=0 -czf ../debian-aarch64-bootstrap.tar.gz $items
+          cd ..
           
           ls -lh debian-aarch64-bootstrap.tar.gz
           echo "✓ TAR.GZ archive created successfully (FLAT structure)"
