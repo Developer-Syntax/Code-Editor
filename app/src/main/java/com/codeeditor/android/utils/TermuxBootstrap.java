@@ -65,7 +65,7 @@ public class TermuxBootstrap {
      * - Standard Linux directory structure (/bin, /usr, /lib, etc)
      */
     private static final String BOOTSTRAP_URL = 
-        "https://github.com/Developer-Syntax/Code-Editor/releases/download/v1.0.0/debian-aarch64-bootstrap.tar.gz";
+        "https://github.com/Developer-Syntax/Code-Editor/releases/download/bootstrap-20251221-201955-637b4ba/debian-aarch64-bootstrap.tar.gz";
     
     // TODO: Update BOOTSTRAP_URL with your GitHub release URL after first build
     
