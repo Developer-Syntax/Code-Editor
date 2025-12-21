@@ -159,21 +159,25 @@ jobs:
           head -10 SYMLINKS.txt
           cd ..
 
-      - name: Create TAR.GZ archive
+      - name: Create TAR.GZ archive (FLAT structure - Termux format)
         run: |
-          echo "Creating TAR.GZ archive..."
+          echo "Creating TAR.GZ archive with FLAT structure (no ./ prefixes)..."
           
           # Fix ownership so tar can read files
           sudo chown -R $(id -u):$(id -g) debian-bootstrap
           
           echo "Bootstrap final size: $(du -sh debian-bootstrap | cut -f1)"
           
-          # Create tarball - use absolute path to avoid "./" prefix
-          # This creates a flat structure: bin/, etc/, lib/, usr/, var/, SYMLINKS.txt (no nested folder)
-          tar --owner=0 --group=0 -czf debian-aarch64-bootstrap.tar.gz -C debian-bootstrap .
+          # Create tarball with FLAT structure
+          # --transform strips leading ./ from all paths
+          # Result: bin/, etc/, lib/, usr/, var/, SYMLINKS.txt (NOT ./bin/, ./etc/, etc.)
+          tar --owner=0 --group=0 \
+              --transform='s,^\./,,' \
+              -czf debian-aarch64-bootstrap.tar.gz \
+              -C debian-bootstrap .
           
           ls -lh debian-aarch64-bootstrap.tar.gz
-          echo "✓ TAR.GZ archive created successfully"
+          echo "✓ TAR.GZ archive created successfully (FLAT structure)"
 
       - name: Verify TAR.GZ archive structure (Termux-compatible format)
         run: |
