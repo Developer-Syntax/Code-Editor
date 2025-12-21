@@ -125,6 +125,30 @@ jobs:
           cd ..
           echo "✓ Additional cleanup complete"
 
+      - name: Create SYMLINKS.txt for bootstrap compatibility
+        run: |
+          echo "Creating SYMLINKS.txt for TermuxBootstrap.java compatibility..."
+          cd debian-bootstrap
+          
+          # Create SYMLINKS.txt file that lists all symlinks
+          # Format: target ← link_path (using arrow ← as separator)
+          > SYMLINKS.txt
+          
+          find . -type l -print0 | while IFS= read -r -d '' symlink; do
+            # Get the absolute link target
+            target=$(readlink -f "$symlink")
+            # Get relative path from bootstrap root
+            rel_target=$(realpath --relative-to=. "$target" 2>/dev/null || readlink "$symlink")
+            # Remove leading ./
+            symlink_clean="${symlink#./}"
+            # Format: target ← symlink_path
+            echo "$rel_target ← $symlink_clean" >> SYMLINKS.txt
+          done
+          
+          echo "✓ SYMLINKS.txt created with $(wc -l < SYMLINKS.txt) entries"
+          head -10 SYMLINKS.txt
+          cd ..
+
       - name: Create TAR.GZ archive
         run: |
           echo "Creating TAR.GZ archive..."
