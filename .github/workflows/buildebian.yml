@@ -134,18 +134,28 @@ jobs:
           # Format: target ← link_path (using arrow ← as separator)
           > SYMLINKS.txt
           
-          find . -type l -print0 | while IFS= read -r -d '' symlink; do
-            # Get the absolute link target
-            target=$(readlink -f "$symlink")
-            # Get relative path from bootstrap root
-            rel_target=$(realpath --relative-to=. "$target" 2>/dev/null || readlink "$symlink")
+          # Find all symlinks and create manifest
+          find . -type l 2>/dev/null | while read symlink; do
             # Remove leading ./
             symlink_clean="${symlink#./}"
-            # Format: target ← symlink_path
-            echo "$rel_target ← $symlink_clean" >> SYMLINKS.txt
+            
+            # Get the link target (what the symlink points to)
+            if target=$(readlink "$symlink" 2>/dev/null); then
+              # Remove leading ./ from target too
+              target_clean="${target#./}"
+              # Format: target ← symlink_path
+              echo "$target_clean ← $symlink_clean" >> SYMLINKS.txt
+            fi
           done
           
+          # Ensure SYMLINKS.txt is not empty
+          if [ ! -s SYMLINKS.txt ]; then
+            echo "Warning: No symlinks found, creating empty SYMLINKS.txt"
+            touch SYMLINKS.txt
+          fi
+          
           echo "✓ SYMLINKS.txt created with $(wc -l < SYMLINKS.txt) entries"
+          echo "Sample entries:"
           head -10 SYMLINKS.txt
           cd ..
 
@@ -165,18 +175,56 @@ jobs:
           ls -lh debian-aarch64-bootstrap.tar.gz
           echo "✓ TAR.GZ archive created successfully"
 
-      - name: Verify TAR.GZ archive
+      - name: Verify TAR.GZ archive structure (Termux-compatible format)
         run: |
-          echo "Verifying TAR.GZ archive structure..."
+          echo "Verifying TAR.GZ archive structure (must match Termux bootstrap format)..."
+          echo ""
           
-          echo "First 20 entries:"
+          # Check for no "./" prefix (flat structure)
+          echo "✓ Checking for flat structure (no ./ prefixes)..."
+          has_dot_prefix=$(tar -tzf debian-aarch64-bootstrap.tar.gz | grep -c "^\\./" || echo "0")
+          if [ "$has_dot_prefix" -gt 0 ]; then
+            echo "✗ ERROR: Archive contains ./ prefixes! Structure not flat."
+            tar -tzf debian-aarch64-bootstrap.tar.gz | grep "^\\./" | head -5
+            exit 1
+          fi
+          echo "✓ No ./ prefixes found - structure is FLAT"
+          echo ""
+          
+          # Verify essential Termux-like directories exist
+          echo "✓ Verifying essential directories..."
+          required_dirs=("bin/" "etc/" "lib/" "usr/" "var/" "tmp/")
+          for dir in "${required_dirs[@]}"; do
+            if tar -tzf debian-aarch64-bootstrap.tar.gz | grep -q "^${dir}" 2>/dev/null; then
+              echo "  ✓ $dir found"
+            else
+              echo "  ✗ WARNING: $dir not found"
+            fi
+          done
+          echo ""
+          
+          # Check for SYMLINKS.txt
+          echo "✓ Verifying SYMLINKS.txt..."
+          if tar -tzf debian-aarch64-bootstrap.tar.gz | grep -q "^SYMLINKS\\.txt$" 2>/dev/null; then
+            echo "  ✓ SYMLINKS.txt found in archive"
+          else
+            echo "  ✗ ERROR: SYMLINKS.txt not found in archive!"
+            exit 1
+          fi
+          echo ""
+          
+          # Show archive contents summary
+          echo "Archive Statistics:"
+          total_files=$(tar -tzf debian-aarch64-bootstrap.tar.gz | wc -l)
+          echo "  Total entries: $total_files"
+          echo "  Archive size: $(ls -lh debian-aarch64-bootstrap.tar.gz | awk '{print $5}')"
+          echo ""
+          
+          echo "First 20 entries (verify flat structure):"
           tar -tzf debian-aarch64-bootstrap.tar.gz | head -20
           echo ""
-          echo "Archive info:"
-          tar -tzf debian-aarch64-bootstrap.tar.gz | wc -l
-          echo "files total"
-          ls -lh debian-aarch64-bootstrap.tar.gz
-          echo "✓ TAR.GZ archive verified (FLAT STRUCTURE - no ./ prefix)"
+          
+          echo "✓ TAR.GZ archive verified (FLAT STRUCTURE - Termux-compatible format)"
 
       - name: Upload TAR.GZ artifact
         uses: actions/upload-artifact@v4
