@@ -1,0 +1,14 @@
+Package: termux-bootstrap
+Version: 2025.12.14-r1
+Architecture: aarch64
+Maintainer: Code Editor Team <support@codeeditor.dev>
+Installed-Size: 100000
+Depends: base-files
+Filename: ../pool/main/termux-bootstrap_2025.12.14-r1_aarch64.tar.gz
+Size: 50000000
+MD5sum: placeholder
+SHA256: placeholder
+Description: Custom Termux bootstrap for Code Editor
+ This is a modified Termux bootstrap with com.codeeditor.android
+ package naming for use with the Code Editor application.
+
