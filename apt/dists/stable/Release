@@ -1,0 +1,9 @@
+Origin: Code Editor
+Label: Code Editor Custom Termux Repository
+Suite: stable
+Version: 1.0
+Codename: stable
+Architectures: aarch64
+Components: main
+Date: Thu Oct  1 04:10:04 UTC 2026
+Acquire-By-Hash: yes
